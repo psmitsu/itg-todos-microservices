@@ -1,5 +1,11 @@
 - Starting the application
         
+        # supply .env file in the root folder
+        JWT_SECRET=your_jwt_secret
+        POSTGRES_DB=your_pg_db_name
+        POSTGRES_USER=your_pg_username
+        POSTGRES_PASSWORD=your_pg_password
+        
         # in the root folder
         docker compose up --build
 
