@@ -1,0 +1,128 @@
+services:
+  # api gateway
+  gateway:
+    build:
+      context: ./gateway/
+      # use dev stage of the image
+      target: dev
+    ports:
+      - 3000:3000
+      # map the debug port
+      # - 9229:9229
+    environment:
+      - NODE_ENV=production
+      - RMQ_HOST=rmq
+      - RMQ_PORT=5672
+      - AUTH_QUEUE=authq
+      - TODOS_QUEUE=todosq
+      # - AUTH_HOST=auth
+      # - AUTH_PORT=3001
+      # - TODOS_HOST=todos
+      # - TODOS_PORT=3002
+    volumes:
+      # bind mount src s.t. changes to source reflected in container immediately
+      - ./gateway/src:/home/node/src
+  # users microservice
+  auth:
+    build:
+      context: ./auth/
+      # use dev stage of the image
+      target: dev
+    ports:
+      - 3001:3001
+      # map the debug port
+      # - 9229:9229
+    environment:
+      - NODE_ENV=production
+      # - AUTH_HOST=auth
+      # - AUTH_PORT=3001
+      - RMQ_HOST=rmq
+      - RMQ_PORT=5672
+      - AUTH_QUEUE=authq
+      - JWT_SECRET=${JWT_SECRET}
+      - POSTGRES_HOST=auth-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      # start the database before the application
+      auth-db:
+        condition: service_healthy
+    volumes:
+      # bind mount src s.t. changes to source reflected in container immediately
+      - ./auth/src:/home/node/src
+  auth-db:
+    image: postgres
+    restart: always
+    user: postgres
+    volumes:
+      # persist database data in a docker volume
+      - auth-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # todos microservice
+  todos:
+    build:
+      context: ./todos/
+      # use dev stage of the image
+      target: dev
+    ports:
+      - 3002:3002
+      # map the debug port
+      # - 9229:9229
+    environment:
+      - NODE_ENV=production
+      - RMQ_HOST=rmq
+      - RMQ_PORT=5672
+      - TODOS_QUEUE=todosq
+      # - TODOS_HOST=todos
+      # - TODOS_PORT=3002
+      - POSTGRES_HOST=todos-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      # start the database before the application
+      todos-db:
+        condition: service_healthy
+    volumes:
+      # bind mount src s.t. changes to source reflected in container immediately
+      - ./todos/src:/home/node/src
+  todos-db:
+    image: postgres
+    restart: always
+    user: postgres
+    volumes:
+      # persist database data in a docker volume
+      - todos-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=5432
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # RabbitMQ service
+  rmq:
+    image: rabbitmq
+    restart: always
+    expose:
+      - 5672
+    hostname: "rmq"
+volumes:
+  auth-data:
+  todos-data:
